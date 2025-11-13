@@ -288,7 +288,7 @@ export default function Sidebar({
             <FolderPlus className="h-4 w-4" />
           </Button>
         </div>
-        <div className="relative">
+        <div className="relative mb-2">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search notes & tags..."
