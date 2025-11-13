@@ -196,22 +196,23 @@ export default function NoteEditor({
     <div className="flex-1 flex flex-col bg-background">
       {/* Header with sidebar toggle */}
       <div className="border-b p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleSidebar}
-            className="gap-2"
-          >
-            <PanelLeft className="h-4 w-4" />
-            {isSidebarOpen ? "Hide" : "Show"} Sidebar
-          </Button>
-        </div>
+        {!isSidebarOpen && (
+          <div className="flex items-center gap-3 mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleSidebar}
+              className="gap-2"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <Input
           value={localNote.title}
           onChange={(e) => updateTitle(e.target.value)}
           placeholder="Untitled Note"
-          className="text-3xl font-bold border-0 focus-visible:ring-0 mb-3 py-[8px] px-[8px]"
+          className="text-2xl font-semibold border-0 focus-visible:ring-0 mb-3 py-[8px] px-[8px]"
         />
 
         {/* Tags Section */}
