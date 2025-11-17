@@ -7,9 +7,10 @@ import { Plus, X } from 'lucide-react';
 interface ChecklistNodeEditorProps {
   node: ChecklistNode;
   onChange: (items: ChecklistItem[]) => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function ChecklistNodeEditor({ node, onChange }: ChecklistNodeEditorProps) {
+export default function ChecklistNodeEditor({ node, onChange, viewMode }: ChecklistNodeEditorProps) {
   const updateItem = (id: string, updates: Partial<ChecklistItem>) => {
     const newItems = node.items.map(item =>
       item.id === id ? { ...item, ...updates } : item
@@ -30,6 +31,26 @@ export default function ChecklistNodeEditor({ node, onChange }: ChecklistNodeEdi
     onChange(node.items.filter(item => item.id !== id));
   };
 
+  // View mode: clean checklist display
+  if (viewMode === 'view') {
+    return (
+      <div className="space-y-2">
+        {node.items.map((item) => (
+          <div key={item.id} className="flex items-center gap-2">
+            <Checkbox
+              checked={item.checked}
+              onCheckedChange={(checked) => updateItem(item.id, { checked: !!checked })}
+            />
+            <span className={item.checked ? 'line-through text-muted-foreground' : ''}>
+              {item.text || 'Empty item'}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Edit mode: full editor with controls
   return (
     <div className="bg-white rounded-lg p-3 space-y-2">
       {node.items.map((item) => (

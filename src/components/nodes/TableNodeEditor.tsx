@@ -6,9 +6,10 @@ import { Plus, Minus } from 'lucide-react';
 interface TableNodeEditorProps {
   node: TableNode;
   onChange: (data: string[][], rows: number, cols: number) => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function TableNodeEditor({ node, onChange }: TableNodeEditorProps) {
+export default function TableNodeEditor({ node, onChange, viewMode }: TableNodeEditorProps) {
   const updateCell = (row: number, col: number, value: string) => {
     const newData = node.data.map((r, i) =>
       i === row ? r.map((c, j) => (j === col ? value : c)) : r
@@ -39,6 +40,28 @@ export default function TableNodeEditor({ node, onChange }: TableNodeEditorProps
     }
   };
 
+  // View mode: clean table display
+  if (viewMode === 'view') {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse border">
+          <tbody>
+            {node.data.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, colIndex) => (
+                  <td key={colIndex} className="border p-2">
+                    {cell || '-'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // Edit mode: full editor with controls
   return (
     <div className="bg-white rounded-lg p-3">
       <div className="overflow-x-auto">

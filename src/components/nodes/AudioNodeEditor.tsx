@@ -6,9 +6,10 @@ import { Mic, Square, Play, Pause, Upload } from 'lucide-react';
 interface AudioNodeEditorProps {
   node: AudioNode;
   onChange: (audioData: string, duration?: number) => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function AudioNodeEditor({ node, onChange }: AudioNodeEditorProps) {
+export default function AudioNodeEditor({ node, onChange, viewMode }: AudioNodeEditorProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -72,6 +73,18 @@ export default function AudioNodeEditor({ node, onChange }: AudioNodeEditorProps
       reader.readAsDataURL(file);
     }
   };
+
+  // View mode: simple audio player
+  if (viewMode === 'view') {
+    if (!node.audioData) {
+      return <div className="text-muted-foreground text-sm">No audio</div>;
+    }
+    return (
+      <div className="p-3 bg-muted rounded-lg">
+        <audio src={node.audioData} controls className="w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg p-4">

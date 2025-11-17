@@ -6,9 +6,10 @@ import { Plus, X } from 'lucide-react';
 interface ListNodeEditorProps {
   node: ListNode;
   onChange: (items: string[]) => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function ListNodeEditor({ node, onChange }: ListNodeEditorProps) {
+export default function ListNodeEditor({ node, onChange, viewMode }: ListNodeEditorProps) {
   const updateItem = (index: number, value: string) => {
     const newItems = [...node.items];
     newItems[index] = value;
@@ -23,6 +24,28 @@ export default function ListNodeEditor({ node, onChange }: ListNodeEditorProps) 
     onChange(node.items.filter((_, i) => i !== index));
   };
 
+  // View mode: clean list display
+  if (viewMode === 'view') {
+    return (
+      <div className="space-y-1">
+        {node.type === 'ordered-list' ? (
+          <ol className="list-decimal list-inside space-y-1">
+            {node.items.map((item, index) => (
+              <li key={index}>{item || 'Empty item'}</li>
+            ))}
+          </ol>
+        ) : (
+          <ul className="list-disc list-inside space-y-1">
+            {node.items.map((item, index) => (
+              <li key={index}>{item || 'Empty item'}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  // Edit mode: full editor with controls
   return (
     <div className="bg-white rounded-lg p-3 space-y-2">
       {node.items.map((item, index) => (

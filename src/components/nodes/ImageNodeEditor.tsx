@@ -7,9 +7,10 @@ interface ImageNodeEditorProps {
   node: ImageNode;
   onChange: (imageData: string, alt: string) => void;
   onClear: () => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function ImageNodeEditor({ node, onChange, onClear }: ImageNodeEditorProps) {
+export default function ImageNodeEditor({ node, onChange, onClear, viewMode }: ImageNodeEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,6 +23,18 @@ export default function ImageNodeEditor({ node, onChange, onClear }: ImageNodeEd
       reader.readAsDataURL(file);
     }
   };
+
+  // View mode: clean image display
+  if (viewMode === 'view') {
+    if (!node.imageData) {
+      return <div className="text-muted-foreground text-sm">No image</div>;
+    }
+    return (
+      <div className="rounded-lg overflow-hidden">
+        <img src={node.imageData} alt={node.alt || 'Image'} className="w-full h-auto" />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg p-4">

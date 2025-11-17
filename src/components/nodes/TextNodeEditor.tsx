@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 interface TextNodeEditorProps {
   node: TextNode;
   onChange: (content: string) => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function TextNodeEditor({ node, onChange }: TextNodeEditorProps) {
+export default function TextNodeEditor({ node, onChange, viewMode }: TextNodeEditorProps) {
   const [content, setContent] = useState(node.content);
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +40,17 @@ export default function TextNodeEditor({ node, onChange }: TextNodeEditorProps) 
     }
   };
 
+  // View mode: clean rendering without toolbar
+  if (viewMode === 'view') {
+    return (
+      <div
+        className="prose prose-sm max-w-none"
+        dangerouslySetInnerHTML={{ __html: content || '<p class="text-muted-foreground">Empty text block</p>' }}
+      />
+    );
+  }
+
+  // Edit mode: full editor with toolbar
   return (
     <div className="bg-white rounded-lg">
       <div className="flex gap-1 mb-2 pb-2 border-b">

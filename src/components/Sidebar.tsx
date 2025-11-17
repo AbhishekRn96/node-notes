@@ -14,6 +14,9 @@ import {
   MoreHorizontal,
   Tag,
   X,
+  Palette,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -21,8 +24,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface SidebarProps {
   notes: Note[];
@@ -36,9 +44,22 @@ interface SidebarProps {
   onCreateFolder: (parentId: string | null) => void;
   onDeleteFolder: (folderId: string) => void;
   onRenameFolder: (folderId: string, newName: string) => void;
+  onUpdateFolderColor: (folderId: string, color: string) => void;
   isOpen: boolean;
   onToggle: () => void;
 }
+
+const FOLDER_COLORS = [
+  { name: "Default", value: "" },
+  { name: "Red", value: "#ef4444" },
+  { name: "Orange", value: "#f97316" },
+  { name: "Yellow", value: "#eab308" },
+  { name: "Green", value: "#22c55e" },
+  { name: "Blue", value: "#3b82f6" },
+  { name: "Purple", value: "#a855f7" },
+  { name: "Pink", value: "#ec4899" },
+  { name: "Gray", value: "#6b7280" },
+];
 
 export default function Sidebar({
   notes,
@@ -52,9 +73,11 @@ export default function Sidebar({
   onCreateFolder,
   onDeleteFolder,
   onRenameFolder,
+  onUpdateFolderColor,
   isOpen,
   onToggle,
 }: SidebarProps) {
+  const { theme, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     new Set(["default-folder"]),
@@ -131,7 +154,10 @@ export default function Sidebar({
               <ChevronRight className="h-3 w-3" />
             )}
           </button>
-          <FolderIcon className="h-4 w-4 text-muted-foreground" />
+          <FolderIcon
+            className="h-4 w-4"
+            style={{ color: folder.color || undefined }}
+          />
           {isEditing ? (
             <Input
               value={editingName}
@@ -174,14 +200,41 @@ export default function Sidebar({
               <DropdownMenuItem onClick={() => startRename(folder)}>
                 Rename
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Palette className="h-3 w-3 mr-2" />
+                  Change Color
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {FOLDER_COLORS.map((color) => (
+                    <DropdownMenuItem
+                      key={color.value}
+                      onClick={() =>
+                        onUpdateFolderColor(folder.id, color.value)
+                      }
+                      className="flex items-center gap-2"
+                    >
+                      <div
+                        className="h-4 w-4 rounded-full border"
+                        style={{ backgroundColor: color.value || "#6b7280" }}
+                      />
+                      {color.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               {folder.id !== "default-folder" && (
-                <DropdownMenuItem
-                  onClick={() => onDeleteFolder(folder.id)}
-                  className="text-destructive"
-                >
-                  <Trash2 className="h-3 w-3 mr-2" />
-                  Delete
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onDeleteFolder(folder.id)}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -256,26 +309,40 @@ export default function Sidebar({
 
   return (
     <div
-      className={`w-72 border-r bg-background h-screen flex flex-col transition-transform duration-300 ease-in-out ${
+      className={`w-72 md:w-80 border-r bg-background h-screen flex flex-col fixed md:relative z-50 transition-transform duration-300 ease-in-out ${
         isOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold">Notes</h1>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggle}
-            className="h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+      <div className="p-3 md:p-4 border-b">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <h1 className="text-lg md:text-xl font-bold">Notes</h1>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="h-8 w-8 p-0"
+            >
+              {theme === "light" ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggle}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-2 mb-2 md:mb-3">
           <Button
             onClick={() => onCreateNote(selectedFolderId || "default-folder")}
-            className="flex-1 bg-violet-900"
+            className="flex-1 bg-violet-600 text-sm md:text-base h-9 md:h-10"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Note
@@ -284,6 +351,7 @@ export default function Sidebar({
             onClick={() => onCreateFolder(null)}
             variant="outline"
             size="icon"
+            className="h-9 w-9 md:h-10 md:w-10"
           >
             <FolderPlus className="h-4 w-4" />
           </Button>
@@ -294,7 +362,7 @@ export default function Sidebar({
             placeholder="Search notes & tags..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 text-sm md:text-base h-9 md:h-10"
           />
         </div>
       </div>

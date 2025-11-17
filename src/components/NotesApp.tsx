@@ -19,6 +19,19 @@ export default function NotesApp() {
       setSelectedNoteId(data.notes[0].id);
       setSelectedFolderId(data.notes[0].folderId);
     }
+
+    // Auto-close sidebar on mobile
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const createNote = (folderId: string) => {
@@ -53,8 +66,10 @@ export default function NotesApp() {
     notesStorage.deleteNote(noteId);
     const newNotes = notes.filter(n => n.id !== noteId);
     setNotes(newNotes);
+    
+    // Clear selection if the deleted note was selected
     if (selectedNoteId === noteId) {
-      setSelectedNoteId(newNotes.length > 0 ? newNotes[0].id : null);
+      setSelectedNoteId(null);
     }
   };
 
@@ -70,10 +85,19 @@ export default function NotesApp() {
   };
 
   const deleteFolder = (folderId: string) => {
+    // Check if the currently selected note is in the folder being deleted
+    const selectedNote = notes.find(n => n.id === selectedNoteId);
+    const isSelectedNoteInFolder = selectedNote?.folderId === folderId;
+    
     notesStorage.deleteFolder(folderId);
     const data = notesStorage.getData();
     setFolders(data.folders);
     setNotes(data.notes);
+    
+    // Clear selection if the note was in the deleted folder
+    if (isSelectedNoteInFolder) {
+      setSelectedNoteId(null);
+    }
   };
 
   const renameFolder = (folderId: string, newName: string) => {
@@ -81,27 +105,48 @@ export default function NotesApp() {
     setFolders(folders.map(f => f.id === folderId ? { ...f, name: newName } : f));
   };
 
+  const updateFolderColor = (folderId: string, color: string) => {
+    notesStorage.updateFolder(folderId, { color });
+    setFolders(folders.map(f => f.id === folderId ? { ...f, color } : f));
+  };
+
   const selectedNote = notes.find(n => n.id === selectedNoteId) || null;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden relative">
+      {/* Overlay for mobile when sidebar is open */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
       <Sidebar
         notes={notes}
         folders={folders}
         selectedNoteId={selectedNoteId}
         selectedFolderId={selectedFolderId}
-        onSelectNote={setSelectedNoteId}
+        onSelectNote={(noteId) => {
+          setSelectedNoteId(noteId);
+          // Auto-close sidebar on mobile after selecting note
+          if (window.innerWidth < 768) {
+            setIsSidebarOpen(false);
+          }
+        }}
         onSelectFolder={setSelectedFolderId}
         onCreateNote={createNote}
         onDeleteNote={deleteNote}
         onCreateFolder={createFolder}
         onDeleteFolder={deleteFolder}
         onRenameFolder={renameFolder}
+        onUpdateFolderColor={updateFolderColor}
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
       />
       <NoteEditor
         note={selectedNote}
+        folders={folders}
         onUpdateNote={updateNote}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}

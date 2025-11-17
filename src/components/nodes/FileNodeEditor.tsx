@@ -7,9 +7,10 @@ interface FileNodeEditorProps {
   node: FileNode;
   onChange: (fileName: string, fileData: string, fileType: string) => void;
   onClear: () => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function FileNodeEditor({ node, onChange, onClear }: FileNodeEditorProps) {
+export default function FileNodeEditor({ node, onChange, onClear, viewMode }: FileNodeEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,6 +23,19 @@ export default function FileNodeEditor({ node, onChange, onClear }: FileNodeEdit
       reader.readAsDataURL(file);
     }
   };
+
+  // View mode: simple file display
+  if (viewMode === 'view') {
+    if (!node.fileName) {
+      return <div className="text-muted-foreground text-sm">No file attached</div>;
+    }
+    return (
+      <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+        <FileIcon className="h-5 w-5" />
+        <span className="text-sm font-medium">{node.fileName}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg p-4">

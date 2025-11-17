@@ -6,12 +6,25 @@ import { Eraser, Pen } from 'lucide-react';
 interface CanvasNodeEditorProps {
   node: CanvasNode;
   onChange: (canvasData: string) => void;
+  viewMode: 'view' | 'edit';
 }
 
-export default function CanvasNodeEditor({ node, onChange }: CanvasNodeEditorProps) {
+export default function CanvasNodeEditor({ node, onChange, viewMode }: CanvasNodeEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
+
+  // View mode: display canvas as image
+  if (viewMode === 'view') {
+    if (!node.canvasData) {
+      return <div className="text-muted-foreground text-sm">Empty canvas</div>;
+    }
+    return (
+      <div className="rounded-lg overflow-hidden border">
+        <img src={node.canvasData} alt="Canvas drawing" className="w-full h-auto" />
+      </div>
+    );
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current;

@@ -1,22 +1,26 @@
-import { useState, useEffect } from "react";
-import { Note, Node, NodeType } from "@/types/notes";
+import { useState, useEffect, useRef } from "react";
+import { Note, Node, NodeType, Folder } from "@/types/notes";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import NodeWrapper from "./nodes/NodeWrapper";
 import NodeTypeSelector from "./NodeTypeSelector";
-import { FileText, X, Tag, Menu, PanelLeft } from "lucide-react";
+import { FileText, X, Tag, PanelLeft, ChevronRight, Folder as FolderIcon, Eye, Edit3 } from "lucide-react";
 
 interface NoteEditorProps {
   note: Note | null;
+  folders: Folder[];
   onUpdateNote: (note: Note) => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
 }
 
+type ViewMode = 'view' | 'edit';
+
 export default function NoteEditor({
   note,
+  folders,
   onUpdateNote,
   onToggleSidebar,
   isSidebarOpen,
@@ -26,24 +30,47 @@ export default function NoteEditor({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [showTagInput, setShowTagInput] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('edit');
 
   useEffect(() => {
     setLocalNote(note);
   }, [note]);
 
+  // Build breadcrumb path
+  const getBreadcrumbs = (folderId: string): Folder[] => {
+    const breadcrumbs: Folder[] = [];
+    let currentFolder = folders.find(f => f.id === folderId);
+    
+    while (currentFolder) {
+      breadcrumbs.unshift(currentFolder);
+      if (currentFolder.parentId) {
+        currentFolder = folders.find(f => f.id === currentFolder!.parentId);
+      } else {
+        break;
+      }
+    }
+    
+    return breadcrumbs;
+  };
+
   if (!localNote) {
     return (
-      <div className="flex-1 flex flex-col bg-background">
-        <div className="border-b p-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleSidebar}
-            className="gap-2"
-          >
-            <PanelLeft className="h-4 w-4" />
-            {isSidebarOpen ? "Hide" : "Show"} Sidebar
-          </Button>
+      <div className="flex-1 flex flex-col bg-background w-full">
+        <div className="border-b p-3 md:p-6">
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            {!isSidebarOpen && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleSidebar}
+                className="gap-2 h-8 md:h-9"
+              >
+                <PanelLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Show Sidebar</span>
+              </Button>
+            )}
+            <div className="flex-1" />
+          </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-muted-foreground">
@@ -163,18 +190,22 @@ export default function NoteEditor({
     onUpdateNote(updated);
   };
 
-  const handleDragStart = (index: number, e: React.MouseEvent) => {
+  const handleDragStart = (index: number, e: React.DragEvent) => {
     e.stopPropagation();
     setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    e.stopPropagation();
     if (draggedIndex === null || draggedIndex === index) return;
     setDragOverIndex(index);
   };
 
-  const handleDrop = (index: number) => {
+  const handleDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (draggedIndex === null || draggedIndex === index) return;
 
     const newNodes = [...localNote.nodes];
@@ -185,6 +216,9 @@ export default function NoteEditor({
     const updated = { ...localNote, nodes: newNodes };
     setLocalNote(updated);
     onUpdateNote(updated);
+    
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   const handleDragEnd = () => {
@@ -192,78 +226,136 @@ export default function NoteEditor({
     setDragOverIndex(null);
   };
 
+  const breadcrumbs = localNote ? getBreadcrumbs(localNote.folderId) : [];
+
   return (
-    <div className="flex-1 flex flex-col bg-background">
+    <div className="flex-1 flex flex-col bg-background w-full">
       {/* Header with sidebar toggle */}
-      <div className="border-b p-6">
-        {!isSidebarOpen && (
-          <div className="flex items-center gap-3 mb-4">
+      <div className="border-b p-3 md:p-6">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          {!isSidebarOpen && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onToggleSidebar}
-              className="gap-2"
+              className="gap-2 h-8 md:h-9"
             >
               <PanelLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Show Sidebar</span>
+            </Button>
+          )}
+          <div className="flex-1" />
+        </div>
+
+        {/* Breadcrumbs and View/Edit Toggle in Same Row */}
+        <div className="flex items-center justify-between mb-2 md:mb-3 gap-2 flex-wrap">
+          {breadcrumbs.length > 0 ? (
+            <div className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground px-1 md:px-2 overflow-x-auto max-w-[60%] md:max-w-none">
+              {breadcrumbs.map((folder, index) => (
+                <div key={folder.id} className="flex items-center gap-1 flex-shrink-0">
+                  <FolderIcon 
+                    className="h-3 w-3" 
+                    style={{ color: folder.color || undefined }}
+                  />
+                  <span className="truncate max-w-[80px] md:max-w-none">{folder.name}</span>
+                  {index < breadcrumbs.length - 1 && (
+                    <ChevronRight className="h-3 w-3" />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div />
+          )}
+          
+          {/* View/Edit Mode Toggle */}
+          <div className="flex items-center gap-1 md:gap-2">
+            <Button
+              variant={viewMode === 'view' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('view')}
+              className="gap-1 md:gap-2 h-7 md:h-8 text-xs md:text-sm px-2 md:px-3"
+            >
+              <Eye className="h-3 w-3" />
+              <span className="hidden sm:inline">View</span>
+            </Button>
+            <Button
+              variant={viewMode === 'edit' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('edit')}
+              className="gap-1 md:gap-2 h-7 md:h-8 text-xs md:text-sm px-2 md:px-3"
+            >
+              <Edit3 className="h-3 w-3" />
+              <span className="hidden sm:inline">Edit</span>
             </Button>
           </div>
-        )}
+        </div>
+
         <Input
           value={localNote.title}
           onChange={(e) => updateTitle(e.target.value)}
           placeholder="Untitled Note"
-          className="text-2xl font-semibold border-0 focus-visible:ring-0 mb-3 py-[8px] px-[8px]"
+          className="text-xl md:text-2xl font-semibold border-0 focus-visible:ring-0 mb-2 md:mb-3 py-[6px] md:py-[8px] px-[6px] md:px-[8px]"
+          readOnly={viewMode === 'view'}
         />
 
         {/* Tags Section */}
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex flex-wrap gap-1 md:gap-2 items-center">
           {localNote.tags.map((tag) => (
-            <Badge key={tag} variant="secondary" className="gap-1 pr-1">
+            <Badge key={tag} variant="secondary" className="gap-1 pr-1 text-xs">
               <Tag className="h-3 w-3" />
               {tag}
-              <button
-                onClick={() => removeTag(tag)}
-                className="ml-1 hover:bg-accent rounded-full p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
+              {viewMode === 'edit' && (
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="ml-1 hover:bg-accent rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </Badge>
           ))}
-          {showTagInput ? (
-            <Input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onBlur={addTag}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addTag();
-                if (e.key === "Escape") {
-                  setShowTagInput(false);
-                  setTagInput("");
-                }
-              }}
-              placeholder="Add tag..."
-              className="h-7 w-32 text-sm"
-              autoFocus
-            />
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowTagInput(true)}
-              className="h-7 px-2 text-xs"
-            >
-              <Tag className="h-3 w-3 mr-1" />
-              Add Tag
-            </Button>
+          {viewMode === 'edit' && (
+            <>
+              {showTagInput ? (
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onBlur={addTag}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addTag();
+                    if (e.key === "Escape") {
+                      setShowTagInput(false);
+                      setTagInput("");
+                    }
+                  }}
+                  placeholder="Add tag..."
+                  className="h-6 md:h-7 w-24 md:w-32 text-xs md:text-sm"
+                  autoFocus
+                />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowTagInput(true)}
+                  className="h-6 md:h-7 px-1 md:px-2 text-xs"
+                >
+                  <Tag className="h-3 w-3 mr-1" />
+                  Add Tag
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
-      <ScrollArea className="flex-1 pb-24">
-        <div className="max-w-4xl mx-auto p-8">
+      <ScrollArea className="flex-1 pb-20 md:pb-24">
+        <div className="max-w-4xl mx-auto p-4 md:p-8">
           {localNote.nodes.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">
-                Click a node type in the toolbar below to start adding content
+            <div className="text-center py-8 md:py-12">
+              <p className="text-sm md:text-base text-muted-foreground mb-4">
+                {viewMode === 'edit' 
+                  ? "Click a node type in the toolbar below to start adding content"
+                  : "This note is empty"}
               </p>
             </div>
           ) : (
@@ -271,9 +363,10 @@ export default function NoteEditor({
               {localNote.nodes.map((node, index) => (
                 <div
                   key={node.id}
-                  draggable={draggedIndex === index}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={() => handleDrop(index)}
+                  draggable={viewMode === 'edit'}
+                  onDragStart={(e) => viewMode === 'edit' && handleDragStart(index, e)}
+                  onDragOver={(e) => viewMode === 'edit' && handleDragOver(e, index)}
+                  onDrop={(e) => viewMode === 'edit' && handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
                   className={`transition-all duration-200 ${
                     draggedIndex === index ? "opacity-40 scale-95" : ""
@@ -288,7 +381,7 @@ export default function NoteEditor({
                     onUpdate={(updatedNode) => updateNode(index, updatedNode)}
                     onDelete={() => deleteNode(index)}
                     onDuplicate={() => duplicateNode(index)}
-                    onDragStart={(e) => handleDragStart(index, e)}
+                    viewMode={viewMode}
                   />
                 </div>
               ))}
@@ -296,12 +389,14 @@ export default function NoteEditor({
           )}
         </div>
       </ScrollArea>
-      {/* Bottom Toolbar */}
-      <div className="fixed bottom-0 left-0 right-0 flex justify-center p-4">
-        <div className="bg-muted/50 backdrop-blur-md rounded-full shadow-2xl border px-6 py-3 max-w-fit">
-          <NodeTypeSelector onSelect={addNode} />
+      {/* Bottom Toolbar - Only show in edit mode */}
+      {viewMode === 'edit' && (
+        <div className="fixed bottom-0 left-0 right-0 flex justify-center p-2 md:p-4">
+          <div className="bg-muted/50 backdrop-blur-md rounded-full shadow-2xl border px-3 md:px-6 py-2 md:py-3 max-w-fit overflow-x-auto">
+            <NodeTypeSelector onSelect={addNode} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
