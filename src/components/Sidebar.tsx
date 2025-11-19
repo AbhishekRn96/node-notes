@@ -342,7 +342,7 @@ export default function Sidebar({
         <div className="flex gap-2 mb-2 md:mb-3">
           <Button
             onClick={() => onCreateNote(selectedFolderId || "default-folder")}
-            className="flex-1 bg-violet-600 text-sm md:text-base h-9 md:h-10"
+            className="flex-1 bg-violet-600 text-sm md:text-base h-9 md:h-10 text-[#fff]"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Note

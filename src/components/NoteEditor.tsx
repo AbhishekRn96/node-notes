@@ -6,7 +6,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import NodeWrapper from "./nodes/NodeWrapper";
 import NodeTypeSelector from "./NodeTypeSelector";
-import { FileText, X, Tag, PanelLeft, ChevronRight, Folder as FolderIcon, Eye, Edit3 } from "lucide-react";
+import {
+  FileText,
+  X,
+  Tag,
+  PanelLeft,
+  ChevronRight,
+  Folder as FolderIcon,
+  Eye,
+  Edit3,
+  Mic,
+  MicOff,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -16,7 +30,7 @@ interface NoteEditorProps {
   isSidebarOpen: boolean;
 }
 
-type ViewMode = 'view' | 'edit';
+type ViewMode = "view" | "edit";
 
 export default function NoteEditor({
   note,
@@ -30,7 +44,12 @@ export default function NoteEditor({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [showTagInput, setShowTagInput] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('edit');
+  const [viewMode, setViewMode] = useState<ViewMode>("edit");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     setLocalNote(note);
@@ -39,17 +58,17 @@ export default function NoteEditor({
   // Build breadcrumb path
   const getBreadcrumbs = (folderId: string): Folder[] => {
     const breadcrumbs: Folder[] = [];
-    let currentFolder = folders.find(f => f.id === folderId);
-    
+    let currentFolder = folders.find((f) => f.id === folderId);
+
     while (currentFolder) {
       breadcrumbs.unshift(currentFolder);
       if (currentFolder.parentId) {
-        currentFolder = folders.find(f => f.id === currentFolder!.parentId);
+        currentFolder = folders.find((f) => f.id === currentFolder!.parentId);
       } else {
         break;
       }
     }
-    
+
     return breadcrumbs;
   };
 
@@ -193,7 +212,7 @@ export default function NoteEditor({
   const handleDragStart = (index: number, e: React.DragEvent) => {
     e.stopPropagation();
     setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -216,7 +235,7 @@ export default function NoteEditor({
     const updated = { ...localNote, nodes: newNodes };
     setLocalNote(updated);
     onUpdateNote(updated);
-    
+
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
@@ -224,6 +243,147 @@ export default function NoteEditor({
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await transcribeAudio(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast({
+        title: "Recording started",
+        description: "Speak now to add content to your note",
+      });
+    } catch (error) {
+      toast({
+        title: "Recording failed",
+        description: "Could not access microphone. Please check permissions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    try {
+      // Using Web Speech API for browser-based transcription
+      const recognition = new (window as any).webkitSpeechRecognition() || new (window as any).SpeechRecognition();
+      
+      toast({
+        title: "Transcribing...",
+        description: "Converting speech to text",
+      });
+
+      // For demo purposes, we'll simulate transcription
+      // In production, you'd send audioBlob to an AI service like OpenAI Whisper
+      setTimeout(() => {
+        const transcribedText = "This is a simulated transcription. In production, integrate with OpenAI Whisper API or similar service.";
+        
+        // Add transcribed text as a new text node
+        const newNode = createNode("text");
+        (newNode as any).content = transcribedText;
+        const newNodes = [...localNote!.nodes, newNode];
+        const updated = { ...localNote!, nodes: newNodes };
+        setLocalNote(updated);
+        onUpdateNote(updated);
+
+        toast({
+          title: "Transcription complete",
+          description: "Speech has been added to your note",
+        });
+      }, 1500);
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: "Could not transcribe audio. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const summarizeNote = async () => {
+    if (!localNote || localNote.nodes.length === 0) {
+      toast({
+        title: "Nothing to summarize",
+        description: "Add some content to your note first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSummarizing(true);
+    
+    try {
+      // Extract all text content from nodes
+      const noteContent = localNote.nodes
+        .map((node) => {
+          if (node.type === "text") return (node as any).content;
+          if (node.type === "checklist") return (node as any).items.map((item: any) => item.text).join("\n");
+          if (node.type === "ordered-list" || node.type === "unordered-list") return (node as any).items.join("\n");
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n\n");
+
+      if (!noteContent.trim()) {
+        toast({
+          title: "No text content",
+          description: "Your note doesn't contain any text to summarize",
+          variant: "destructive",
+        });
+        setIsSummarizing(false);
+        return;
+      }
+
+      // Simulate AI summarization
+      // In production, integrate with OpenAI GPT-4 or similar
+      setTimeout(() => {
+        const summary = `📝 AI Summary:\n\nThis note contains ${localNote.nodes.length} content blocks. Key points have been identified and organized.\n\nIn production, this would be replaced with actual AI-generated summary using OpenAI GPT-4 or similar service.\n\nOriginal content length: ${noteContent.length} characters`;
+        
+        // Add summary as a new text node at the top
+        const summaryNode = createNode("text");
+        (summaryNode as any).content = summary;
+        const newNodes = [summaryNode, ...localNote.nodes];
+        const updated = { ...localNote, nodes: newNodes };
+        setLocalNote(updated);
+        onUpdateNote(updated);
+
+        toast({
+          title: "Summary generated",
+          description: "AI summary has been added to the top of your note",
+        });
+        setIsSummarizing(false);
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Summarization failed",
+        description: "Could not generate summary. Please try again.",
+        variant: "destructive",
+      });
+      setIsSummarizing(false);
+    }
   };
 
   const breadcrumbs = localNote ? getBreadcrumbs(localNote.folderId) : [];
@@ -245,6 +405,43 @@ export default function NoteEditor({
             </Button>
           )}
           <div className="flex-1" />
+          
+          {/* AI Actions */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={summarizeNote}
+              disabled={isSummarizing || !localNote || localNote.nodes.length === 0}
+              className="gap-2 h-8 md:h-9"
+            >
+              {isSummarizing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              <span className="hidden md:inline">AI Summary</span>
+            </Button>
+            
+            <Button
+              variant={isRecording ? "destructive" : "outline"}
+              size="sm"
+              onClick={isRecording ? stopRecording : startRecording}
+              className="gap-2 h-8 md:h-9"
+            >
+              {isRecording ? (
+                <>
+                  <MicOff className="h-4 w-4" />
+                  <span className="hidden md:inline">Stop</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="h-4 w-4" />
+                  <span className="hidden md:inline">Record</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Breadcrumbs and View/Edit Toggle in Same Row */}
@@ -252,12 +449,17 @@ export default function NoteEditor({
           {breadcrumbs.length > 0 ? (
             <div className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground px-1 md:px-2 overflow-x-auto max-w-[60%] md:max-w-none">
               {breadcrumbs.map((folder, index) => (
-                <div key={folder.id} className="flex items-center gap-1 flex-shrink-0">
-                  <FolderIcon 
-                    className="h-3 w-3" 
+                <div
+                  key={folder.id}
+                  className="flex items-center gap-1 flex-shrink-0"
+                >
+                  <FolderIcon
+                    className="h-3 w-3"
                     style={{ color: folder.color || undefined }}
                   />
-                  <span className="truncate max-w-[80px] md:max-w-none">{folder.name}</span>
+                  <span className="truncate max-w-[80px] md:max-w-none">
+                    {folder.name}
+                  </span>
                   {index < breadcrumbs.length - 1 && (
                     <ChevronRight className="h-3 w-3" />
                   )}
@@ -267,23 +469,23 @@ export default function NoteEditor({
           ) : (
             <div />
           )}
-          
+
           {/* View/Edit Mode Toggle */}
           <div className="flex items-center gap-1 md:gap-2">
             <Button
-              variant={viewMode === 'view' ? 'default' : 'ghost'}
+              variant={viewMode === "view" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setViewMode('view')}
+              onClick={() => setViewMode("view")}
               className="gap-1 md:gap-2 h-7 md:h-8 text-xs md:text-sm px-2 md:px-3"
             >
               <Eye className="h-3 w-3" />
               <span className="hidden sm:inline">View</span>
             </Button>
             <Button
-              variant={viewMode === 'edit' ? 'default' : 'ghost'}
+              variant={viewMode === "edit" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setViewMode('edit')}
-              className="gap-1 md:gap-2 h-7 md:h-8 text-xs md:text-sm px-2 md:px-3"
+              onClick={() => setViewMode("edit")}
+              className="gap-1 md:gap-2 h-7 md:h-8 text-xs md:text-sm px-2 md:px-3 bg-violet-600 text-[#fff]"
             >
               <Edit3 className="h-3 w-3" />
               <span className="hidden sm:inline">Edit</span>
@@ -296,7 +498,7 @@ export default function NoteEditor({
           onChange={(e) => updateTitle(e.target.value)}
           placeholder="Untitled Note"
           className="text-xl md:text-2xl font-semibold border-0 focus-visible:ring-0 mb-2 md:mb-3 py-[6px] md:py-[8px] px-[6px] md:px-[8px]"
-          readOnly={viewMode === 'view'}
+          readOnly={viewMode === "view"}
         />
 
         {/* Tags Section */}
@@ -305,7 +507,7 @@ export default function NoteEditor({
             <Badge key={tag} variant="secondary" className="gap-1 pr-1 text-xs">
               <Tag className="h-3 w-3" />
               {tag}
-              {viewMode === 'edit' && (
+              {viewMode === "edit" && (
                 <button
                   onClick={() => removeTag(tag)}
                   className="ml-1 hover:bg-accent rounded-full p-0.5"
@@ -315,7 +517,7 @@ export default function NoteEditor({
               )}
             </Badge>
           ))}
-          {viewMode === 'edit' && (
+          {viewMode === "edit" && (
             <>
               {showTagInput ? (
                 <Input
@@ -353,7 +555,7 @@ export default function NoteEditor({
           {localNote.nodes.length === 0 ? (
             <div className="text-center py-8 md:py-12">
               <p className="text-sm md:text-base text-muted-foreground mb-4">
-                {viewMode === 'edit' 
+                {viewMode === "edit"
                   ? "Click a node type in the toolbar below to start adding content"
                   : "This note is empty"}
               </p>
@@ -363,10 +565,14 @@ export default function NoteEditor({
               {localNote.nodes.map((node, index) => (
                 <div
                   key={node.id}
-                  draggable={viewMode === 'edit'}
-                  onDragStart={(e) => viewMode === 'edit' && handleDragStart(index, e)}
-                  onDragOver={(e) => viewMode === 'edit' && handleDragOver(e, index)}
-                  onDrop={(e) => viewMode === 'edit' && handleDrop(e, index)}
+                  draggable={viewMode === "edit"}
+                  onDragStart={(e) =>
+                    viewMode === "edit" && handleDragStart(index, e)
+                  }
+                  onDragOver={(e) =>
+                    viewMode === "edit" && handleDragOver(e, index)
+                  }
+                  onDrop={(e) => viewMode === "edit" && handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
                   className={`transition-all duration-200 ${
                     draggedIndex === index ? "opacity-40 scale-95" : ""
@@ -390,7 +596,7 @@ export default function NoteEditor({
         </div>
       </ScrollArea>
       {/* Bottom Toolbar - Only show in edit mode */}
-      {viewMode === 'edit' && (
+      {viewMode === "edit" && (
         <div className="fixed bottom-0 left-0 right-0 flex justify-center p-2 md:p-4">
           <div className="bg-muted/50 backdrop-blur-md rounded-full shadow-2xl border px-3 md:px-6 py-2 md:py-3 max-w-fit overflow-x-auto">
             <NodeTypeSelector onSelect={addNode} />
